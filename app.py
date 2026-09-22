@@ -3,17 +3,21 @@
 Drop documents (.txt / .md / .pdf) into ./data, start the server and chat with
 them in your browser. Works with a local Ollama model or the OpenAI API.
 
+If no model is reachable, it automatically falls back to keyword-based
+retrieval so the system still works out of the box.
+
 Quick start:
     pip install -r requirements.txt
     cp .env.example .env   # then edit the provider/model
     python app.py          # open http://localhost:8000
 """
+import hashlib
 import json
 import math
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from dotenv import load_dotenv
@@ -46,6 +50,7 @@ INDEX_FILE = DATA_DIR / "index.json"
 CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "600"))
 CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
 TOP_K = int(os.getenv("RAG_TOP_K", "4"))
+HASH_DIM = 512
 
 
 # --------------------------------------------------------------------------- #
@@ -67,31 +72,44 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
 
 
 # --------------------------------------------------------------------------- #
-# Embeddings + generation (Ollama or OpenAI)
+# Embeddings + generation (Ollama or OpenAI, with a no-model fallback)
 # --------------------------------------------------------------------------- #
+def hash_embed(text: str) -> List[float]:
+    """Bag-of-words hashing embedding — requires no external model."""
+    vec = [0.0] * HASH_DIM
+    for word in re.findall(r"\w+", text.lower()):
+        h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
+        vec[h % HASH_DIM] += 1.0
+    norm = math.sqrt(sum(x * x for x in vec))
+    return [x / norm for x in vec] if norm else vec
+
+
 def _embed(text: str) -> List[float]:
-    if PROVIDER == "openai":
-        if not OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY is not set")
+    try:
+        if PROVIDER == "openai":
+            if not OPENAI_API_KEY:
+                raise RuntimeError("OPENAI_API_KEY is not set")
+            resp = httpx.post(
+                f"{OPENAI_BASE_URL}/embeddings",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                json={"model": OPENAI_EMBED_MODEL, "input": text},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            return resp.json()["data"][0]["embedding"]
+
         resp = httpx.post(
-            f"{OPENAI_BASE_URL}/embeddings",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": OPENAI_EMBED_MODEL, "input": text},
+            f"{OLLAMA_URL}/api/embeddings",
+            json={"model": OLLAMA_EMBED_MODEL, "prompt": text},
             timeout=60,
         )
         resp.raise_for_status()
-        return resp.json()["data"][0]["embedding"]
-
-    resp = httpx.post(
-        f"{OLLAMA_URL}/api/embeddings",
-        json={"model": OLLAMA_EMBED_MODEL, "prompt": text},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()["embedding"]
+        return resp.json()["embedding"]
+    except Exception:
+        return hash_embed(text)
 
 
-def _generate(prompt: str, context: str) -> str:
+def _generate(prompt: str, context: str) -> Optional[str]:
     messages = [
         {
             "role": "system",
@@ -106,24 +124,26 @@ def _generate(prompt: str, context: str) -> str:
             "content": f"Context:\n{context}\n\nQuestion: {prompt}",
         },
     ]
+    try:
+        if PROVIDER == "openai":
+            resp = httpx.post(
+                f"{OPENAI_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                json={"model": OPENAI_CHAT_MODEL, "messages": messages},
+                timeout=120,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
 
-    if PROVIDER == "openai":
         resp = httpx.post(
-            f"{OPENAI_BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": OPENAI_CHAT_MODEL, "messages": messages},
+            f"{OLLAMA_URL}/api/chat",
+            json={"model": OLLAMA_CHAT_MODEL, "messages": messages, "stream": False},
             timeout=120,
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
-
-    resp = httpx.post(
-        f"{OLLAMA_URL}/api/chat",
-        json={"model": OLLAMA_CHAT_MODEL, "messages": messages, "stream": False},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    return resp.json()["message"]["content"]
+        return resp.json()["message"]["content"]
+    except Exception:
+        return None
 
 
 # --------------------------------------------------------------------------- #
@@ -200,12 +220,27 @@ def answer(
     question: str, records: List[Dict[str, Any]], top_k: int = TOP_K
 ) -> Tuple[str, List[str]]:
     if not records:
-        return "No documents indexed yet. Add files to ./data and click Re-index.", []
+        return (
+            "لا توجد مستندات مفهرسة بعد. أضف ملفات إلى مجلد data ثم اضغط «فهرسة المستندات».",
+            [],
+        )
     hits = retrieve(question, records, top_k)
     context = "\n\n".join(h["text"] for h in hits)
-    answer_text = _generate(question, context)
+    generated = _generate(question, context)
+    if generated:
+        answer_text = generated
+    else:
+        answer_text = (
+            "⚠️ لا يوجد نموذج لغوي متاح — هذا وضع الاسترجاع النصي. إليك المقاطع الأكثر صلة:\n\n"
+            + "\n\n———\n\n".join(h["text"] for h in hits)
+        )
     sources = sorted({h["source"] for h in hits})
     return answer_text, sources
+
+
+def get_stats(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+    sources = sorted({r["source"] for r in records})
+    return {"documents": len(sources), "chunks": len(records), "sources": sources}
 
 
 # --------------------------------------------------------------------------- #
@@ -241,6 +276,20 @@ def ingest():
         return {"indexed": count, "chunks": len(_records)}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
+
+
+@app.get("/api/stats")
+def stats():
+    return get_stats(_records)
+
+
+@app.post("/api/clear")
+def clear():
+    global _records
+    _records = []
+    if INDEX_FILE.exists():
+        INDEX_FILE.unlink()
+    return {"ok": True, "documents": 0, "chunks": 0}
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
