@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --grad: linear-gradient(135deg, #6366F1 0%, #8B5CF6 55%, #D946EF 100%);
+      --grad: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #D946EF 100%);
       --ink: #0F172A;
       --muted: #64748B;
       --bg: #F4F6FB;
@@ -21,58 +21,50 @@
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      font-family: 'Tajawal', 'Inter', system-ui, sans-serif;
-      color: var(--ink);
+      margin: 0; min-height: 100vh; background: var(--bg);
+      font-family: 'Tajawal', 'Inter', system-ui, sans-serif; color: var(--ink);
       -webkit-font-smoothing: antialiased;
     }
     body[dir="ltr"] { font-family: 'Inter', 'Tajawal', system-ui, sans-serif; }
-
     .wrap { max-width: 820px; margin: 0 auto; padding: 0 20px 32px; }
 
     header {
-      background: var(--grad);
-      color: #fff;
-      margin: 0 0 20px;
-      padding: 22px 24px;
-      border-radius: 0 0 22px 22px;
-      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.28);
+      background: var(--grad); color: #fff; padding: 22px 24px 18px;
+      border-radius: 0 0 26px 26px; box-shadow: 0 10px 30px rgba(99,102,241,0.3);
     }
     header .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .brand .logo {
-      width: 42px; height: 42px; border-radius: 12px;
-      background: rgba(255,255,255,0.2); display: grid; place-items: center; font-size: 22px;
-      backdrop-filter: blur(4px);
-    }
-    .brand h1 { font-size: 1.35rem; font-weight: 800; margin: 0; }
-    .brand p { font-size: 0.82rem; margin: 2px 0 0; opacity: 0.85; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo-svg { flex: none; }
+    .brand h1 { font-size: 1.4rem; font-weight: 800; margin: 0; }
+    .brand p { font-size: 0.82rem; margin: 3px 0 0; opacity: 0.88; }
 
-    .lang-switch {
-      display: flex; background: rgba(255,255,255,0.16);
-      border-radius: 999px; padding: 3px; gap: 2px;
-    }
+    .lang-switch { display: flex; background: rgba(255,255,255,0.16); border-radius: 999px; padding: 3px; gap: 2px; }
     .lang-switch button {
-      border: 0; background: transparent; color: #fff; cursor: pointer;
-      padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
-      font-family: inherit; transition: all 0.15s;
+      border: 0; background: transparent; color: #fff; cursor: pointer; padding: 7px 14px;
+      border-radius: 999px; font-weight: 700; font-size: 0.85rem; font-family: inherit; transition: all 0.15s;
     }
     .lang-switch button.active { background: #fff; color: #6D28D9; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 
-    .stats {
-      display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px;
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28);
+      padding: 5px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      backdrop-filter: blur(4px);
     }
+
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 12px; }
     .pill {
+      display: inline-flex; align-items: center; gap: 6px;
       background: var(--card); border: 1px solid var(--line); border-radius: 999px;
-      padding: 6px 14px; font-size: 0.82rem; color: var(--muted); box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+      padding: 7px 14px; font-size: 0.84rem; color: var(--muted); box-shadow: 0 1px 3px rgba(15,23,42,0.05);
     }
+    .pill .ic { font-size: 0.95rem; }
     .pill b { color: var(--ink); font-weight: 700; }
 
     #log {
       background: var(--card); border: 1px solid var(--line); border-radius: 18px;
-      padding: 18px; min-height: 320px; max-height: 56vh; overflow-y: auto;
+      padding: 18px; min-height: 300px; max-height: 54vh; overflow-y: auto;
       box-shadow: 0 6px 20px rgba(15,23,42,0.05);
     }
     .msg { margin: 12px 0; display: flex; flex-direction: column; }
@@ -80,10 +72,7 @@
     .msg.bot { align-items: flex-start; }
     body[dir="ltr"] .msg.user { align-items: flex-start; }
     body[dir="ltr"] .msg.bot { align-items: flex-end; }
-    .bubble {
-      max-width: 85%; padding: 11px 15px; border-radius: 14px; line-height: 1.8;
-      white-space: pre-wrap; font-size: 0.95rem;
-    }
+    .bubble { max-width: 85%; padding: 11px 15px; border-radius: 14px; line-height: 1.8; white-space: pre-wrap; font-size: 0.95rem; }
     .msg.user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; }
     .msg.bot .bubble { background: #F8FAFF; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
     .src { font-size: 0.76rem; color: #94A3B8; margin-top: 5px; padding: 0 4px; }
@@ -99,6 +88,7 @@
     button.primary {
       border: 0; background: var(--grad); color: #fff; padding: 14px 22px; border-radius: 14px;
       font-weight: 700; font-size: 15px; font-family: inherit; cursor: pointer; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 8px;
       box-shadow: 0 6px 16px rgba(139,92,246,0.3); transition: transform 0.1s, box-shadow 0.1s;
     }
     button.primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(139,92,246,0.4); }
@@ -106,7 +96,7 @@
     button.ghost {
       border: 1px solid var(--line); background: var(--card); color: var(--muted);
       padding: 9px 16px; border-radius: 12px; font-family: inherit; font-weight: 600;
-      font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+      font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;
     }
     button.ghost:hover { border-color: var(--accent); color: var(--accent); }
     .hint { color: #94A3B8; font-size: 0.82rem; margin-top: 12px; text-align: center; }
@@ -117,7 +107,12 @@
     <div class="wrap">
       <div class="row">
         <div class="brand">
-          <div class="logo">📄</div>
+          <svg class="logo-svg" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="44" height="44" rx="13" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.35)"/>
+            <path d="M14 10h10l7 7v16a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2Z" fill="#fff"/>
+            <path d="M24 10v7h7" fill="none" stroke="#8B5CF6" stroke-width="1.7" stroke-linejoin="round"/>
+            <circle cx="33" cy="11" r="3" fill="#FDE047"/>
+          </svg>
           <div>
             <h1 data-i18n="title">اسأل مستنداتك</h1>
             <p data-i18n="tagline">محرك إجابات ذكي يعتمد على مستنداتك</p>
@@ -128,24 +123,30 @@
           <button id="lang-en" type="button">EN</button>
         </div>
       </div>
+      <div class="badges">
+        <span class="badge">⚡ RAG</span>
+        <span class="badge" data-i18n="b_local">🔒 محلي بالكامل</span>
+        <span class="badge">📄 PDF</span>
+        <span class="badge" data-i18n="b_openai">🤖 يدعم OpenAI</span>
+      </div>
     </div>
   </header>
 
   <div class="wrap">
     <div class="stats">
-      <span class="pill"><b data-i18n="docs">المستندات</b>: <b id="stat-docs">0</b></span>
-      <span class="pill"><b data-i18n="chunks">المقاطع</b>: <b id="stat-chunks">0</b></span>
+      <span class="pill"><span class="ic">📄</span> <b data-i18n="docs">المستندات</b>: <b id="stat-docs">0</b></span>
+      <span class="pill"><span class="ic">🧩</span> <b data-i18n="chunks">المقاطع</b>: <b id="stat-chunks">0</b></span>
     </div>
 
     <div id="log"></div>
 
     <form id="form">
       <input id="q" data-i18n-ph="placeholder" placeholder="اطرح سؤالًا هنا..." autocomplete="off" />
-      <button class="primary" type="submit" data-i18n="send">إرسال</button>
+      <button class="primary" type="submit"><span>➤</span> <span data-i18n="send">إرسال</span></button>
     </form>
     <div class="tools">
-      <button class="ghost" id="reindex" type="button" data-i18n="reindex">فهرسة المستندات</button>
-      <button class="ghost" id="clear-chat" type="button" data-i18n="clear">مسح المحادثة</button>
+      <button class="ghost" id="reindex" type="button"><span>🔄</span> <span data-i18n="reindex">فهرسة المستندات</span></button>
+      <button class="ghost" id="clear-chat" type="button"><span>🗑️</span> <span data-i18n="clear">مسح المحادثة</span></button>
     </div>
     <p class="hint" data-i18n="hint">💡 جرّب: «ما هي ثلاثية CIA؟» أو «ما هو RAG؟»</p>
   </div>
@@ -153,34 +154,22 @@
   <script>
     const STR = {
       ar: {
-        title: 'اسأل مستنداتك',
-        tagline: 'محرك إجابات ذكي يعتمد على مستنداتك',
-        docs: 'المستندات',
-        chunks: 'المقاطع',
-        placeholder: 'اطرح سؤالًا هنا...',
-        send: 'إرسال',
-        reindex: 'فهرسة المستندات',
-        clear: 'مسح المحادثة',
+        title: 'اسأل مستنداتك', tagline: 'محرك إجابات ذكي يعتمد على مستنداتك',
+        docs: 'المستندات', chunks: 'المقاطع', placeholder: 'اطرح سؤالًا هنا...', send: 'إرسال',
+        reindex: 'فهرسة المستندات', clear: 'مسح المحادثة',
         hint: '💡 جرّب: «ما هي ثلاثية CIA؟» أو «ما هو RAG؟»',
-        sources: 'المصادر',
-        indexing: 'جارٍ الفهرسة…',
-        error: 'خطأ',
-        you: 'أنت'
+        sources: 'المصادر', indexing: 'جارٍ الفهرسة…', error: 'خطأ', you: 'أنت',
+        matches: 'مطابقة', lines: 'الأسطر',
+        b_local: '🔒 محلي بالكامل', b_openai: '🤖 يدعم OpenAI'
       },
       en: {
-        title: 'Ask Your Documents',
-        tagline: 'A smart document-based answers engine',
-        docs: 'Documents',
-        chunks: 'Chunks',
-        placeholder: 'Ask a question...',
-        send: 'Send',
-        reindex: 'Re-index documents',
-        clear: 'Clear chat',
+        title: 'Ask Your Documents', tagline: 'A smart document-based answers engine',
+        docs: 'Documents', chunks: 'Chunks', placeholder: 'Ask a question...', send: 'Send',
+        reindex: 'Re-index documents', clear: 'Clear chat',
         hint: '💡 Try: "What is the CIA triad?" or "What is RAG?"',
-        sources: 'Sources',
-        indexing: 'Indexing…',
-        error: 'Error',
-        you: 'You'
+        sources: 'Sources', indexing: 'Indexing…', error: 'Error', you: 'You',
+        matches: 'matches', lines: 'lines',
+        b_local: '🔒 Local-first', b_openai: '🤖 OpenAI ready'
       }
     };
 
@@ -192,16 +181,11 @@
       lang = l;
       document.documentElement.lang = l;
       document.documentElement.dir = (l === 'ar') ? 'rtl' : 'ltr';
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        el.textContent = STR[l][el.dataset.i18n] || el.textContent;
-      });
-      document.querySelectorAll('[data-i18n-ph]').forEach(el => {
-        el.placeholder = STR[l][el.dataset.i18nPh] || el.placeholder;
-      });
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = STR[l][el.dataset.i18n] || el.textContent; });
+      document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = STR[l][el.dataset.i18nPh] || el.placeholder; });
       document.getElementById('lang-ar').classList.toggle('active', l === 'ar');
       document.getElementById('lang-en').classList.toggle('active', l === 'en');
     }
-
     document.getElementById('lang-ar').addEventListener('click', () => applyLang('ar'));
     document.getElementById('lang-en').addEventListener('click', () => applyLang('en'));
 
@@ -212,7 +196,6 @@
       log.appendChild(d);
       log.scrollTop = log.scrollHeight;
     }
-
     async function refreshStats() {
       try {
         const r = await fetch('/api/stats');
@@ -233,8 +216,12 @@
         const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
         const data = await r.json();
         add('bot', '<div class="bubble" dir="auto">🤖 ' + (data.answer || '') + '</div>');
-        if (data.sources && data.sources.length) {
-          add('bot', '<div class="src" dir="ltr">' + STR[lang].sources + ': ' + esc(data.sources.join(', ')) + '</div>');
+        if (data.sources && data.sources.length) add('bot', '<div class="src" dir="ltr">' + STR[lang].sources + ': ' + esc(data.sources.join(', ')) + '</div>');
+        if (data.matches && data.matches.length) {
+          data.matches.forEach(m => {
+            const lines = (m.lines && m.lines.length) ? m.lines.join('، ') : '-';
+            add('bot', '<div class="src" dir="ltr">📌 ' + esc(m.source) + ' — ' + m.count + ' ' + STR[lang].matches + ' · ' + STR[lang].lines + ': ' + esc(lines) + '</div>');
+          });
         }
       } catch (err) { add('bot', '<div class="bubble" dir="auto">⚠️ ' + STR[lang].error + ': ' + esc(err) + '</div>'); }
     });
