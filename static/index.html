@@ -1,38 +1,62 @@
 <!doctype html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AskDocs — اسأل مستنداتك</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 760px; margin: 0 auto; padding: 24px; color: #111; }
-    h1 { margin-bottom: 4px; }
-    p.sub { color: #666; margin-top: 0; }
-    code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; direction: ltr; unicode-bidi: embed; }
-    #log { min-height: 300px; max-height: 60vh; border: 1px solid #ddd; border-radius: 10px; padding: 16px; overflow-y: auto; background: #fafafa; }
-    .msg { margin: 10px 0; }
-    .q { font-weight: 600; }
-    .a { white-space: pre-wrap; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px; }
-    .src { color: #777; font-size: 0.82em; margin-top: 4px; }
-    form { display: flex; gap: 8px; margin-top: 14px; }
-    input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
-    button { padding: 12px 16px; border: 0; background: #4F46E5; color: #fff; border-radius: 8px; cursor: pointer; font-size: 15px; white-space: nowrap; }
-    #reindex { background: #555; margin-top: 12px; }
-    .hint { color: #888; font-size: 0.85em; margin-top: 10px; }
+    :root { --primary: #4F46E5; --primary-hover: #4338CA; --bg: #fafafa; --border: #e5e7eb; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Tajawal', 'Segoe UI', system-ui, sans-serif;
+      max-width: 760px; margin: 0 auto; padding: 28px 20px;
+      color: #111827; background: #ffffff; direction: rtl;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { font-size: 1.7rem; font-weight: 800; margin: 0 0 4px; }
+    p.sub { color: #6b7280; margin: 0 0 18px; }
+    code {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      background: #f3f4f6; padding: 2px 6px; border-radius: 5px;
+      font-size: 0.9em; direction: ltr; unicode-bidi: embed;
+    }
+    #log { min-height: 320px; max-height: 62vh; border: 1px solid var(--border); border-radius: 14px; padding: 18px; overflow-y: auto; background: var(--bg); }
+    .msg { margin: 12px 0; }
+    .q { font-weight: 700; color: #111827; }
+    .a { white-space: pre-wrap; background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px 14px; line-height: 1.85; }
+    .src { color: #9ca3af; font-size: 0.8rem; margin-top: 6px; direction: ltr; text-align: left; }
+    form { display: flex; gap: 10px; margin-top: 16px; }
+    input {
+      flex: 1; padding: 13px 16px; border: 1px solid #d1d5db; border-radius: 10px;
+      font-size: 15px; font-family: 'Tajawal', sans-serif;
+    }
+    input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+    button {
+      padding: 13px 20px; border: 0; background: var(--primary); color: #fff;
+      border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 700;
+      font-family: 'Tajawal', sans-serif; white-space: nowrap;
+    }
+    button:hover { background: var(--primary-hover); }
+    #reindex { background: #6b7280; margin-top: 12px; }
+    #reindex:hover { background: #4b5563; }
+    .hint { color: #9ca3af; font-size: 0.85rem; margin-top: 12px; }
   </style>
 </head>
 <body>
-  <h1>AskDocs 📄 اسأل مستنداتك</h1>
+  <h1>AskDocs 📄 <span style="font-weight:400">اسأل مستنداتك</span></h1>
   <p class="sub">اسأل عن محتوى مستنداتك في <code>./data</code></p>
 
   <div id="log"></div>
 
   <form id="form">
-    <input id="q" placeholder="اطرح سؤالًا..." autocomplete="off" />
+    <input id="q" placeholder="اطرح سؤالًا هنا..." autocomplete="off" />
     <button type="submit">إرسال</button>
   </form>
   <p><button id="reindex" type="button">فهرسة المستندات</button></p>
-  <p class="hint">جرّب: «ما هو RAG؟»</p>
+  <p class="hint">💡 جرّب: «ما هو RAG؟»</p>
 
   <script>
     const log = document.getElementById('log');
@@ -60,10 +84,10 @@
         const data = await r.json();
         add('<div class="a" dir="auto">🤖 ' + esc(data.answer || '') + '</div>');
         if (data.sources && data.sources.length) {
-          add('<div class="src" dir="ltr">المصادر: ' + esc(data.sources.join(', ')) + '</div>');
+          add('<div class="src">المصادر: ' + esc(data.sources.join(', ')) + '</div>');
         }
       } catch (err) {
-        add('<div class="a" dir="auto">خطأ: ' + esc(err) + '</div>');
+        add('<div class="a" dir="auto">⚠️ خطأ: ' + esc(err) + '</div>');
       }
     });
     document.getElementById('reindex').addEventListener('click', async () => {
@@ -71,7 +95,7 @@
       try {
         const r = await fetch('/api/ingest', { method: 'POST' });
         const data = await r.json();
-        add('<div class="src" dir="ltr">' + esc(JSON.stringify(data)) + '</div>');
+        add('<div class="src">' + esc(JSON.stringify(data)) + '</div>');
       } catch (err) {
         add('<div class="src">خطأ: ' + esc(err) + '</div>');
       }
