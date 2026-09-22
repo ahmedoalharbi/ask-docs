@@ -12,6 +12,7 @@ Quick start:
     python app.py          # open http://localhost:8000
 """
 import hashlib
+import html as _html
 import json
 import math
 import os
@@ -216,6 +217,31 @@ def retrieve(query: str, records: List[Dict[str, Any]], top_k: int = TOP_K) -> L
     return [r for _, r in scored[:top_k]]
 
 
+STOPWORDS = {
+    "ما", "هي", "هو", "في", "من", "عن", "على", "أن", "إلى", "كان", "هذا", "هذه",
+    "ذلك", "كيف", "لماذا", "أين", "اين", "ماذا", "الذي", "التي", "الذين", "مع",
+    "لا", "لم", "لن", "هل", "او", "أو", "و",
+    "what", "is", "are", "the", "a", "an", "of", "in", "on", "for", "to",
+    "how", "why", "where", "when", "which", "who", "do", "does", "did",
+}
+
+
+def highlight_terms(text: str, query: str) -> str:
+    """HTML-escape text and wrap matched query terms in <mark> tags."""
+    escaped = _html.escape(text)
+    terms = {t.lower() for t in re.findall(r"\w+", query) if len(t) >= 2}
+    terms -= {t for t in terms if t in STOPWORDS}
+    for term in sorted(terms, key=len, reverse=True):
+        safe = _html.escape(term)
+        escaped = re.sub(
+            re.escape(safe),
+            lambda m: f"<mark>{m.group(0)}</mark>",
+            escaped,
+            flags=re.IGNORECASE,
+        )
+    return escaped
+
+
 def answer(
     question: str, records: List[Dict[str, Any]], top_k: int = TOP_K
 ) -> Tuple[str, List[str]]:
@@ -228,11 +254,16 @@ def answer(
     context = "\n\n".join(h["text"] for h in hits)
     generated = _generate(question, context)
     if generated:
-        answer_text = generated
+        answer_text = _html.escape(generated)
     else:
+        parts = [
+            f"【{_html.escape(h['source'])}】\n{highlight_terms(h['text'], question)}"
+            for h in hits
+        ]
         answer_text = (
-            "⚠️ لا يوجد نموذج لغوي متاح — هذا وضع الاسترجاع النصي. إليك المقاطع الأكثر صلة:\n\n"
-            + "\n\n———\n\n".join(h["text"] for h in hits)
+            "⚠️ لا يوجد نموذج لغوي متاح — هذا وضع الاسترجاع النصي. "
+            "المقاطع الأكثر صلة (المطابق مظلّل):\n\n"
+            + "\n\n———\n\n".join(parts)
         )
     sources = sorted({h["source"] for h in hits})
     return answer_text, sources
