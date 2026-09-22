@@ -25,6 +25,7 @@
     .q { font-weight: 700; color: #111827; }
     .a { white-space: pre-wrap; background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px 14px; line-height: 1.85; }
     .src { color: #9ca3af; font-size: 0.78rem; margin-top: 6px; direction: ltr; text-align: left; }
+    mark { background: #FEF08A; color: #111; padding: 0 2px; border-radius: 3px; }
     form { display: flex; gap: 10px; margin-top: 16px; }
     input { flex: 1; padding: 13px 16px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 15px; font-family: 'Tajawal', sans-serif; }
     input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
@@ -81,7 +82,7 @@
       try {
         const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
         const data = await r.json();
-        add('<div class="a" dir="auto">🤖 ' + esc(data.answer || '') + '</div>');
+        add('<div class="a" dir="auto">🤖 ' + (data.answer || '') + '</div>');
         if (data.sources && data.sources.length) add('<div class="src">المصادر: ' + esc(data.sources.join(', ')) + '</div>');
       } catch (err) { add('<div class="a" dir="auto">⚠️ خطأ: ' + esc(err) + '</div>'); }
     });
