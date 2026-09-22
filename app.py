@@ -58,17 +58,19 @@ HASH_DIM = 512
 # Text chunking
 # --------------------------------------------------------------------------- #
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    text = re.sub(r"\s+", " ", text).strip()
-    if not text:
-        return []
+    """Split text into line-aware chunks (each chunk keeps its line breaks)."""
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    lines = [line for line in lines if line]
     chunks: List[str] = []
-    start = 0
-    while start < len(text):
-        end = min(start + size, len(text))
-        chunks.append(text[start:end])
-        if end >= len(text):
-            break
-        start = end - overlap
+    current = ""
+    for line in lines:
+        if current and len(current) + len(line) + 1 > size:
+            chunks.append(current)
+            current = line
+        else:
+            current = f"{current}\n{line}" if current else line
+    if current:
+        chunks.append(current)
     return chunks
 
 
@@ -226,12 +228,16 @@ STOPWORDS = {
 }
 
 
+def query_terms(query: str) -> List[str]:
+    terms = {t.lower() for t in re.findall(r"\w+", query) if len(t) >= 2}
+    terms -= {t for t in terms if t in STOPWORDS}
+    return sorted(terms, key=len, reverse=True)
+
+
 def highlight_terms(text: str, query: str) -> str:
     """HTML-escape text and wrap matched query terms in <mark> tags."""
     escaped = _html.escape(text)
-    terms = {t.lower() for t in re.findall(r"\w+", query) if len(t) >= 2}
-    terms -= {t for t in terms if t in STOPWORDS}
-    for term in sorted(terms, key=len, reverse=True):
+    for term in query_terms(query):
         safe = _html.escape(term)
         escaped = re.sub(
             re.escape(safe),
@@ -242,22 +248,49 @@ def highlight_terms(text: str, query: str) -> str:
     return escaped
 
 
+def match_info(text: str, query: str) -> Dict[str, Any]:
+    """Return match count, matched line numbers (1-based), and matched terms."""
+    terms = query_terms(query)
+    lines = text.splitlines() or [text]
+    matched_terms: List[str] = []
+    match_lines: List[int] = []
+    total = 0
+    for i, line in enumerate(lines, 1):
+        found = False
+        for term in terms:
+            cnt = len(re.findall(re.escape(term), line, flags=re.IGNORECASE))
+            if cnt:
+                total += cnt
+                found = True
+                if term not in matched_terms:
+                    matched_terms.append(term)
+        if found:
+            match_lines.append(i)
+    return {"count": total, "lines": match_lines, "terms": matched_terms}
+
+
 def answer(
     question: str, records: List[Dict[str, Any]], top_k: int = TOP_K
-) -> Tuple[str, List[str]]:
+) -> Tuple[str, List[str], List[Dict[str, Any]]]:
     if not records:
         return (
             "لا توجد مستندات مفهرسة بعد. أضف ملفات إلى مجلد data ثم اضغط «فهرسة المستندات».",
+            [],
             [],
         )
     hits = retrieve(question, records, top_k)
     context = "\n\n".join(h["text"] for h in hits)
     generated = _generate(question, context)
+    matches: List[Dict[str, Any]] = []
     if generated:
         answer_text = _html.escape(generated)
     else:
         parts = [
             f"【{_html.escape(h['source'])}】\n{highlight_terms(h['text'], question)}"
+            for h in hits
+        ]
+        matches = [
+            {"source": h["source"], **match_info(h["text"], question)}
             for h in hits
         ]
         answer_text = (
@@ -266,7 +299,7 @@ def answer(
             + "\n\n———\n\n".join(parts)
         )
     sources = sorted({h["source"] for h in hits})
-    return answer_text, sources
+    return answer_text, sources, matches
 
 
 def get_stats(records: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -294,8 +327,8 @@ def index() -> FileResponse:
 
 @app.post("/api/chat")
 def chat(q: Query):
-    answer_text, sources = answer(q.question, _records, q.top_k)
-    return {"answer": answer_text, "sources": sources}
+    answer_text, sources, matches = answer(q.question, _records, q.top_k)
+    return {"answer": answer_text, "sources": sources, "matches": matches}
 
 
 @app.post("/api/ingest")
