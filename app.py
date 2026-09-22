@@ -11,6 +11,7 @@ Quick start:
     cp .env.example .env   # then edit the provider/model
     python app.py          # open http://localhost:8000
 """
+import datetime
 import hashlib
 import html as _html
 import json
@@ -22,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -48,6 +49,7 @@ OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 DATA_DIR = Path(os.getenv("RAG_DATA_DIR", str(BASE_DIR / "data")))
 INDEX_FILE = DATA_DIR / "index.json"
+HISTORY_FILE = DATA_DIR / "history.json"
 CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "600"))
 CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
 TOP_K = int(os.getenv("RAG_TOP_K", "4"))
@@ -307,12 +309,26 @@ def get_stats(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"documents": len(sources), "chunks": len(records), "sources": sources}
 
 
+def load_history() -> List[Dict[str, Any]]:
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_history() -> None:
+    HISTORY_FILE.write_text(json.dumps(_history, ensure_ascii=False), encoding="utf-8")
+
+
 # --------------------------------------------------------------------------- #
 # App
 # --------------------------------------------------------------------------- #
 app = FastAPI(title="AskDocs — RAG Assistant")
 
 _records: List[Dict[str, Any]] = load_index()
+_history: List[Dict[str, Any]] = load_history()
 
 
 class Query(BaseModel):
@@ -326,8 +342,17 @@ def index() -> FileResponse:
 
 
 @app.post("/api/chat")
-def chat(q: Query):
+def chat(q: Query, request: Request):
     answer_text, sources, matches = answer(q.question, _records, q.top_k)
+    _history.append(
+        {
+            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "query": q.question,
+            "ip": request.client.host if request.client else "",
+            "ua": request.headers.get("user-agent", ""),
+        }
+    )
+    save_history()
     return {"answer": answer_text, "sources": sources, "matches": matches}
 
 
@@ -354,6 +379,19 @@ def clear():
     if INDEX_FILE.exists():
         INDEX_FILE.unlink()
     return {"ok": True, "documents": 0, "chunks": 0}
+
+
+@app.get("/api/history")
+def history():
+    return {"history": list(reversed(_history[-50:]))}
+
+
+@app.post("/api/clear-history")
+def clear_history():
+    global _history
+    _history = []
+    save_history()
+    return {"ok": True}
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
