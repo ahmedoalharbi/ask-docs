@@ -17,37 +17,29 @@
       -webkit-font-smoothing: antialiased;
     }
     h1 { font-size: 1.7rem; font-weight: 800; margin: 0 0 4px; }
-    p.sub { color: #6b7280; margin: 0 0 18px; }
-    code {
-      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-      background: #f3f4f6; padding: 2px 6px; border-radius: 5px;
-      font-size: 0.9em; direction: ltr; unicode-bidi: embed;
-    }
-    #log { min-height: 320px; max-height: 62vh; border: 1px solid var(--border); border-radius: 14px; padding: 18px; overflow-y: auto; background: var(--bg); }
+    p.sub { color: #6b7280; margin: 0 0 14px; }
+    code { font-family: ui-monospace, Menlo, monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 0.9em; direction: ltr; unicode-bidi: embed; }
+    #stats { font-size: 0.85rem; color: #6b7280; margin: 0 0 12px; }
+    #log { min-height: 300px; max-height: 58vh; border: 1px solid var(--border); border-radius: 14px; padding: 18px; overflow-y: auto; background: var(--bg); }
     .msg { margin: 12px 0; }
     .q { font-weight: 700; color: #111827; }
     .a { white-space: pre-wrap; background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px 14px; line-height: 1.85; }
-    .src { color: #9ca3af; font-size: 0.8rem; margin-top: 6px; direction: ltr; text-align: left; }
+    .src { color: #9ca3af; font-size: 0.78rem; margin-top: 6px; direction: ltr; text-align: left; }
     form { display: flex; gap: 10px; margin-top: 16px; }
-    input {
-      flex: 1; padding: 13px 16px; border: 1px solid #d1d5db; border-radius: 10px;
-      font-size: 15px; font-family: 'Tajawal', sans-serif;
-    }
+    input { flex: 1; padding: 13px 16px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 15px; font-family: 'Tajawal', sans-serif; }
     input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
-    button {
-      padding: 13px 20px; border: 0; background: var(--primary); color: #fff;
-      border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 700;
-      font-family: 'Tajawal', sans-serif; white-space: nowrap;
-    }
+    button { padding: 13px 18px; border: 0; background: var(--primary); color: #fff; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 700; font-family: 'Tajawal', sans-serif; white-space: nowrap; }
     button:hover { background: var(--primary-hover); }
-    #reindex { background: #6b7280; margin-top: 12px; }
-    #reindex:hover { background: #4b5563; }
+    .tools { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+    #reindex, #clear-chat { background: #6b7280; }
+    #reindex:hover, #clear-chat:hover { background: #4b5563; }
     .hint { color: #9ca3af; font-size: 0.85rem; margin-top: 12px; }
   </style>
 </head>
 <body>
   <h1>AskDocs 📄 <span style="font-weight:400">اسأل مستنداتك</span></h1>
   <p class="sub">اسأل عن محتوى مستنداتك في <code>./data</code></p>
+  <div id="stats">المستندات: 0 · المقاطع: 0</div>
 
   <div id="log"></div>
 
@@ -55,11 +47,15 @@
     <input id="q" placeholder="اطرح سؤالًا هنا..." autocomplete="off" />
     <button type="submit">إرسال</button>
   </form>
-  <p><button id="reindex" type="button">فهرسة المستندات</button></p>
-  <p class="hint">💡 جرّب: «ما هو RAG؟»</p>
+  <div class="tools">
+    <button id="reindex" type="button">فهرسة المستندات</button>
+    <button id="clear-chat" type="button">مسح المحادثة</button>
+  </div>
+  <p class="hint">💡 جرّب: «ما هو RAG؟» أو «ما هي ثلاثية CIA؟» أو «ما نماذج الخدمة السحابية؟»</p>
 
   <script>
     const log = document.getElementById('log');
+    const statsEl = document.getElementById('stats');
     const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
     function add(html) {
       const d = document.createElement('div');
@@ -67,6 +63,13 @@
       d.innerHTML = html;
       log.appendChild(d);
       log.scrollTop = log.scrollHeight;
+    }
+    async function refreshStats() {
+      try {
+        const r = await fetch('/api/stats');
+        const data = await r.json();
+        statsEl.textContent = 'المستندات: ' + data.documents + ' · المقاطع: ' + data.chunks;
+      } catch (e) { /* ignore */ }
     }
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -76,19 +79,11 @@
       add('<div class="q" dir="auto">' + esc(q) + '</div>');
       input.value = '';
       try {
-        const r = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q })
-        });
+        const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
         const data = await r.json();
         add('<div class="a" dir="auto">🤖 ' + esc(data.answer || '') + '</div>');
-        if (data.sources && data.sources.length) {
-          add('<div class="src">المصادر: ' + esc(data.sources.join(', ')) + '</div>');
-        }
-      } catch (err) {
-        add('<div class="a" dir="auto">⚠️ خطأ: ' + esc(err) + '</div>');
-      }
+        if (data.sources && data.sources.length) add('<div class="src">المصادر: ' + esc(data.sources.join(', ')) + '</div>');
+      } catch (err) { add('<div class="a" dir="auto">⚠️ خطأ: ' + esc(err) + '</div>'); }
     });
     document.getElementById('reindex').addEventListener('click', async () => {
       add('<div class="src">جارٍ الفهرسة…</div>');
@@ -96,10 +91,13 @@
         const r = await fetch('/api/ingest', { method: 'POST' });
         const data = await r.json();
         add('<div class="src">' + esc(JSON.stringify(data)) + '</div>');
-      } catch (err) {
-        add('<div class="src">خطأ: ' + esc(err) + '</div>');
-      }
+        refreshStats();
+      } catch (err) { add('<div class="src">خطأ: ' + esc(err) + '</div>'); }
     });
+    document.getElementById('clear-chat').addEventListener('click', () => {
+      log.innerHTML = '';
+    });
+    refreshStats();
   </script>
 </body>
 </html>
