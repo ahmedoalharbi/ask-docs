@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AskDocs — RAG Assistant</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 760px; margin: 0 auto; padding: 24px; color: #111; }
+    h1 { margin-bottom: 4px; }
+    p.sub { color: #666; margin-top: 0; }
+    code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; }
+    #log { min-height: 300px; max-height: 60vh; border: 1px solid #ddd; border-radius: 10px; padding: 16px; overflow-y: auto; background: #fafafa; }
+    .msg { margin: 10px 0; }
+    .q { font-weight: 600; }
+    .a { white-space: pre-wrap; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px; }
+    .src { color: #777; font-size: 0.82em; margin-top: 4px; }
+    form { display: flex; gap: 8px; margin-top: 14px; }
+    input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
+    button { padding: 12px 18px; border: 0; background: #4F46E5; color: #fff; border-radius: 8px; cursor: pointer; font-size: 15px; }
+    #reindex { background: #555; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>AskDocs 📄</h1>
+  <p class="sub">Ask questions about the documents in <code>./data</code>.</p>
+
+  <div id="log"></div>
+
+  <form id="form">
+    <input id="q" placeholder="Ask a question..." autocomplete="off" />
+    <button type="submit">Ask</button>
+  </form>
+  <p><button id="reindex" type="button">Re-index documents</button></p>
+
+  <script>
+    const log = document.getElementById('log');
+    const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    function add(html) {
+      const d = document.createElement('div');
+      d.className = 'msg';
+      d.innerHTML = html;
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+    }
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('q');
+      const q = input.value.trim();
+      if (!q) return;
+      add('<div class="q">You: ' + esc(q) + '</div>');
+      input.value = '';
+      try {
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q })
+        });
+        const data = await r.json();
+        add('<div class="a">🤖 ' + esc(data.answer || '') + '</div>');
+        if (data.sources && data.sources.length) {
+          add('<div class="src">Sources: ' + esc(data.sources.join(', ')) + '</div>');
+        }
+      } catch (err) {
+        add('<div class="a">Error: ' + esc(err) + '</div>');
+      }
+    });
+    document.getElementById('reindex').addEventListener('click', async () => {
+      add('<div class="src">Indexing…</div>');
+      try {
+        const r = await fetch('/api/ingest', { method: 'POST' });
+        const data = await r.json();
+        add('<div class="src">' + esc(JSON.stringify(data)) + '</div>');
+      } catch (err) {
+        add('<div class="src">Error: ' + esc(err) + '</div>');
+      }
+    });
+  </script>
+</body>
+</html>
