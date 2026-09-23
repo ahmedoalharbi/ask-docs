@@ -116,6 +116,35 @@
     .h-item:last-child { border-bottom: 0; }
     .h-item .q { font-weight: 700; }
     .h-item .meta { color: var(--muted); font-size: 0.76rem; direction: ltr; text-align: left; }
+
+    .docs-panel {
+      margin: 14px 0 0; border: 1px solid var(--line); border-radius: 16px; background: var(--card);
+      padding: 14px; box-shadow: 0 4px 14px rgba(15,23,42,0.04);
+    }
+    .docs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+    .docs-head b { font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px; }
+    .drop-zone {
+      border: 2px dashed var(--line); border-radius: 14px; padding: 18px 14px; text-align: center;
+      color: var(--muted); font-size: 0.86rem; cursor: pointer; transition: all 0.15s; background: var(--bot-bubble);
+    }
+    .drop-zone:hover, .drop-zone.drag {
+      border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,0.06);
+    }
+    .drop-zone .dz-ic { font-size: 1.7rem; display: block; margin-bottom: 4px; }
+    .drop-zone input { display: none; }
+    .doc-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .doc-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 10px; border: 1px solid var(--line); border-radius: 11px; font-size: 0.85rem;
+    }
+    .doc-item .name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+    .doc-item .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-item .size { color: var(--muted); font-size: 0.75rem; direction: ltr; }
+    .doc-item button {
+      border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 0.9rem;
+      border-radius: 8px; padding: 4px 8px; transition: all 0.15s; flex: none;
+    }
+    .doc-item button:hover { color: #EF4444; background: rgba(239,68,68,0.1); }
   </style>
 </head>
 <body>
@@ -158,6 +187,20 @@
       <span class="pill"><span class="ic">🧩</span> <b data-i18n="chunks">المقاطع</b>: <b id="stat-chunks">0</b></span>
     </div>
 
+    <div class="docs-panel">
+      <div class="docs-head">
+        <b>📂 <span data-i18n="myDocs">مستنداتي</span></b>
+        <button class="ghost" id="add-doc-btn" type="button"><span>＋</span> <span data-i18n="upload">رفع مستندات</span></button>
+      </div>
+      <div class="drop-zone" id="drop-zone">
+        <span class="dz-ic">⬆️</span>
+        <span data-i18n="drop">اسحب الملفات هنا أو اضغط للاختيار</span>
+        <div style="font-size:0.74rem;opacity:0.75" data-i18n="dropHint">المدعوم: txt · md · pdf</div>
+        <input type="file" id="file-input" accept=".txt,.md,.pdf" multiple />
+      </div>
+      <div class="doc-list" id="doc-list"></div>
+    </div>
+
     <div id="log"></div>
 
     <form id="form">
@@ -190,7 +233,11 @@
         sources: 'المصادر', indexing: 'جارٍ الفهرسة…', error: 'خطأ',
         matches: 'مطابقة', lines: 'الأسطر',
         b_local: '🔒 محلي بالكامل', b_openai: '🤖 يدعم OpenAI',
-        history: 'سجل البحث', clearHistory: 'مسح السجل', noHistory: 'لا يوجد سجل بعد', device: 'الجهاز'
+        history: 'سجل البحث', clearHistory: 'مسح السجل', noHistory: 'لا يوجد سجل بعد', device: 'الجهاز',
+        myDocs: 'مستنداتي', upload: 'رفع مستندات', drop: 'اسحب الملفات هنا أو اضغط للاختيار',
+        dropHint: 'المدعوم: txt · md · pdf', uploading: 'جارٍ الرفع والفهرسة…',
+        delete: 'حذف', noDocs: 'لا توجد مستندات بعد', confirmDel: 'حذف هذا المستند نهائيًا؟',
+        uploadDone: 'تم رفع وفهرسة', uploadError: 'فشل الرفع'
       },
       en: {
         title: 'Ask Your Documents', tagline: 'A smart document-based answers engine',
@@ -200,13 +247,17 @@
         sources: 'Sources', indexing: 'Indexing…', error: 'Error',
         matches: 'matches', lines: 'lines',
         b_local: '🔒 Local-first', b_openai: '🤖 OpenAI ready',
-        history: 'Search history', clearHistory: 'Clear history', noHistory: 'No history yet', device: 'Device'
+        history: 'Search history', clearHistory: 'Clear history', noHistory: 'No history yet', device: 'Device',
+        myDocs: 'My documents', upload: 'Upload documents', drop: 'Drag files here or click to browse',
+        dropHint: 'Supported: txt · md · pdf', uploading: 'Uploading & indexing…',
+        delete: 'Delete', noDocs: 'No documents yet', confirmDel: 'Delete this document permanently?',
+        uploadDone: 'Uploaded & indexed', uploadError: 'Upload failed'
       }
     };
 
     let lang = 'ar';
     const log = document.getElementById('log');
-    const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
     function applyLang(l) {
       lang = l;
@@ -262,7 +313,76 @@
       } catch (e) { /* ignore */ }
     }
 
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function loadDocuments() {
+      const list = document.getElementById('doc-list');
+      list.innerHTML = '';
+      try {
+        const r = await fetch('/api/documents');
+        const data = await r.json();
+        const docs = data.documents || [];
+        if (!docs.length) {
+          list.innerHTML = '<div class="doc-item" style="justify-content:center;color:var(--muted)">' + STR[lang].noDocs + '</div>';
+          return;
+        }
+        docs.forEach(d => {
+          const item = document.createElement('div');
+          item.className = 'doc-item';
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'name';
+          nameDiv.innerHTML = '📄 <span></span>';
+          nameDiv.querySelector('span').textContent = d.name;
+          nameDiv.querySelector('span').title = d.name;
+          const right = document.createElement('div');
+          right.style.cssText = 'display:flex;align-items:center;gap:6px';
+          const size = document.createElement('span');
+          size.className = 'size';
+          size.textContent = formatSize(d.size);
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.title = STR[lang].delete;
+          del.textContent = '🗑️';
+          del.dataset.del = d.name;
+          right.appendChild(size);
+          right.appendChild(del);
+          item.appendChild(nameDiv);
+          item.appendChild(right);
+          list.appendChild(item);
+        });
+      } catch (e) {
+        list.innerHTML = '<div class="doc-item" style="justify-content:center;color:var(--muted)">' + STR[lang].error + '</div>';
+      }
+    }
+
+    async function uploadFiles(files) {
+      if (!files || !files.length) return;
+      add('bot', '<div class="src">' + STR[lang].uploading + '</div>');
+      for (const file of files) {
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const r = await fetch('/api/upload', { method: 'POST', body: fd });
+          const data = await r.json();
+          if (data.error) {
+            add('bot', '<div class="src">⚠️ ' + STR[lang].uploadError + ': ' + esc(data.error) + '</div>');
+          } else {
+            add('bot', '<div class="src">✅ ' + STR[lang].uploadDone + ': ' + esc(data.file) + ' (' + data.chunks + ' ' + STR[lang].chunks + ')</div>');
+          }
+        } catch (err) {
+          add('bot', '<div class="src">⚠️ ' + STR[lang].uploadError + ': ' + esc(err) + '</div>');
+        }
+      }
+      refreshStats();
+      loadDocuments();
+    }
+
     async function loadHistory() {
+      const panel = document.getElementById('history-panel');
       const list = document.getElementById('history-list');
       list.innerHTML = '';
       try {
@@ -325,9 +445,38 @@
 
     document.getElementById('clear-chat').addEventListener('click', () => { log.innerHTML = ''; });
 
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    document.getElementById('add-doc-btn').addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => { uploadFiles(fileInput.files); fileInput.value = ''; });
+    ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag'); }));
+    dropZone.addEventListener('drop', e => {
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) uploadFiles(files);
+    });
+
+    document.getElementById('doc-list').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-del]');
+      if (!btn) return;
+      const name = btn.dataset.del;
+      if (!confirm(STR[lang].confirmDel + '\n' + name)) return;
+      try {
+        const r = await fetch('/api/delete-document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+        const data = await r.json();
+        if (data.error) add('bot', '<div class="src">⚠️ ' + STR[lang].error + ': ' + esc(data.error) + '</div>');
+      } catch (err) {
+        add('bot', '<div class="src">⚠️ ' + STR[lang].error + ': ' + esc(err) + '</div>');
+      }
+      refreshStats();
+      loadDocuments();
+    });
+
     applyLang('ar');
     applyTheme(localStorage.getItem('theme') || 'light');
     refreshStats();
+    loadDocuments();
   </script>
 </body>
 </html>
