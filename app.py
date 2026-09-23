@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -54,6 +54,18 @@ CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "600"))
 CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
 TOP_K = int(os.getenv("RAG_TOP_K", "4"))
 HASH_DIM = 512
+ALLOWED_SUFFIXES = {".txt", ".md", ".pdf"}
+
+
+def safe_filename(name: str) -> str:
+    """Return a safe, non-empty basename; reject path traversal and bad suffixes."""
+    raw = Path(name).name.strip()
+    raw = raw.replace("\x00", "")
+    if not raw or raw in {".", ".."} or raw.startswith(".") and raw not in {".txt"}:
+        raise ValueError("اسم ملف غير صالح")
+    if Path(raw).suffix.lower() not in ALLOWED_SUFFIXES:
+        raise ValueError("الصيغة غير مدعومة (المدعوم: txt / md / pdf)")
+    return raw
 
 
 # --------------------------------------------------------------------------- #
@@ -336,6 +348,10 @@ class Query(BaseModel):
     top_k: int = TOP_K
 
 
+class DeleteDoc(BaseModel):
+    name: str
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(str(STATIC_DIR / "index.html"))
@@ -365,6 +381,59 @@ def ingest():
         return {"indexed": count, "chunks": len(_records)}
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
+
+
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...)):
+    global _records
+    try:
+        name = safe_filename(file.filename or "")
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        data = await file.read()
+        (DATA_DIR / name).write_bytes(data)
+        count, _records = build_index()
+        save_index(_records)
+        return {
+            "ok": True,
+            "file": name,
+            "size": len(data),
+            "documents": len({r["source"] for r in _records}),
+            "chunks": len(_records),
+        }
+    except ValueError as exc:
+        return {"error": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+
+
+@app.get("/api/documents")
+def documents():
+    docs = []
+    if DATA_DIR.exists():
+        for path in sorted(DATA_DIR.iterdir()):
+            if path.is_file() and path.suffix.lower() in ALLOWED_SUFFIXES:
+                docs.append({"name": path.name, "size": path.stat().st_size})
+    return {"documents": docs}
+
+
+@app.post("/api/delete-document")
+def delete_document(doc: DeleteDoc):
+    global _records
+    try:
+        name = safe_filename(doc.name)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    target = DATA_DIR / name
+    if not target.exists() or not target.is_file():
+        return {"error": "الملف غير موجود"}
+    target.unlink()
+    count, _records = build_index()
+    save_index(_records)
+    return {
+        "ok": True,
+        "documents": len({r["source"] for r in _records}),
+        "chunks": len(_records),
+    }
 
 
 @app.get("/api/stats")
